@@ -10,6 +10,7 @@ truststore.inject_into_ssl()
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -94,6 +95,7 @@ def _pack_pending(message: Message) -> Dict[str, Any]:
         **info,
         "caption": message.caption,
         "caption_entities": [e.model_dump() for e in entities],
+        "message_id": message.message_id,
     }
 
 
@@ -115,6 +117,13 @@ async def _send_transformed(bot: Bot, chat_id: int, pending: Dict[str, Any], old
         await bot.send_audio(audio=file_id, **kwargs)
     elif media_type == "photo":
         await bot.send_photo(photo=file_id, **kwargs)
+
+    original_message_id = pending.get("message_id")
+    if original_message_id is not None:
+        try:
+            await bot.delete_message(chat_id=chat_id, message_id=original_message_id)
+        except TelegramBadRequest as exc:
+            logger.warning("chat=%s could not delete original message %s: %s", chat_id, original_message_id, exc)
 
     return new_caption != original_caption
 
