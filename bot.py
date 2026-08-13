@@ -97,9 +97,12 @@ def _pack_pending(message: Message) -> Dict[str, Any]:
     }
 
 
-async def _send_transformed(bot: Bot, chat_id: int, pending: Dict[str, Any], old: str, new: str) -> None:
+async def _send_transformed(bot: Bot, chat_id: int, pending: Dict[str, Any], old: str, new: str) -> bool:
+    """Sends the file back with the rule applied to its caption. Returns True if the
+    caption actually changed (i.e. `old` was found), False if nothing matched."""
     entities = [MessageEntity(**e) for e in pending.get("caption_entities") or []]
-    new_caption, new_entities = replace_preserving_entities(pending.get("caption"), entities, old, new)
+    original_caption = pending.get("caption")
+    new_caption, new_entities = replace_preserving_entities(original_caption, entities, old, new)
 
     kwargs = {"chat_id": chat_id, "caption": new_caption, "caption_entities": new_entities}
     media_type = pending["media_type"]
@@ -112,6 +115,8 @@ async def _send_transformed(bot: Bot, chat_id: int, pending: Dict[str, Any], old
         await bot.send_audio(audio=file_id, **kwargs)
     elif media_type == "photo":
         await bot.send_photo(photo=file_id, **kwargs)
+
+    return new_caption != original_caption
 
 
 @router.message(CommandStart())
@@ -140,7 +145,12 @@ async def handle_file(message: Message, state: FSMContext) -> None:
     if old is not None and new is not None:
         pending = _pack_pending(message)
         logger.info("chat=%s auto-applying rule %r -> %r to %s", message.chat.id, old, new, pending["media_type"])
-        await _send_transformed(message.bot, message.chat.id, pending, old, new)
+        changed = await _send_transformed(message.bot, message.chat.id, pending, old, new)
+        if not changed:
+            await message.answer(
+                f"⚠️ \"{escape_for_display(old)}\" ushbu faylning caption'ida topilmadi — hech narsa o'zgarmadi.\n"
+                "Matnni caption'dan nusxalab (copy-paste) qilib qayta tekshiring, keyin /newRule bilan qoidani qayta o'rnating."
+            )
         return
 
     pending_files: List[Dict[str, Any]] = data.get("pending_files", [])
@@ -163,7 +173,10 @@ async def handle_old_text(message: Message, state: FSMContext) -> None:
         return
     await state.update_data(old=unescape(message.text))
     await state.set_state(ReplaceStates.waiting_new)
-    await message.answer("Ushbu matn nimaga o'zgarishi kerakligini kiriting:")
+    await message.answer(
+        "Ushbu matn nimaga o'zgarishi kerakligini kiriting:\n"
+        "(butunlay olib tashlamoqchi bo'lsangiz /empty deb yozing)"
+    )
 
 
 @router.message(ReplaceStates.waiting_new)
@@ -174,7 +187,7 @@ async def handle_new_text(message: Message, state: FSMContext) -> None:
 
     data = await state.get_data()
     old = data["old"]
-    new = unescape(message.text)
+    new = "" if message.text.strip().lower() == "/empty" else unescape(message.text)
     pending_files: List[Dict[str, Any]] = data.get("pending_files", [])
 
     await state.set_state(None)
@@ -186,8 +199,16 @@ async def handle_new_text(message: Message, state: FSMContext) -> None:
         "Endi barcha yuborilgan va keyingi fayllar avtomatik o'zgartiriladi."
     )
 
+    any_unmatched = False
     for pending in pending_files:
-        await _send_transformed(message.bot, message.chat.id, pending, old, new)
+        changed = await _send_transformed(message.bot, message.chat.id, pending, old, new)
+        any_unmatched = any_unmatched or not changed
+
+    if any_unmatched:
+        await message.answer(
+            f"⚠️ \"{escape_for_display(old)}\" ba'zi fayllar caption'ida aynan topilmadi — o'sha fayllarda hech narsa o'zgarmadi.\n"
+            "Matnni caption'dan nusxalab (copy-paste) qilib /newRule bilan qayta urinib ko'ring."
+        )
 
 
 @router.message(F.text & ~F.text.startswith("/"))
