@@ -15,7 +15,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import Message, MessageEntity
+from aiogram.types import BotCommand, Message, MessageEntity
 from dotenv import load_dotenv
 
 from entity_utils import replace_preserving_entities
@@ -132,10 +132,23 @@ async def _send_transformed(bot: Bot, chat_id: int, pending: Dict[str, Any], old
 async def cmd_start(message: Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer(
-        "Salom! Menga fayl (video, hujjat, rasm yoki audio) yuboring.\n"
-        "Keyin qaysi matnni nimaga o'zgartirish kerakligini so'rayman va shu qoidani "
-        "barcha keyingi fayllarga avtomatik qo'llayman.\n\n"
-        "Qoidani tozalash uchun /newRule buyrug'ini yuboring."
+        "🤖 <b>Fayl caption almashtiruvchi bot</b>\n\n"
+        "Yuborgan fayllaringizning tavsifidagi (caption) matnni siz belgilagan qoida bo'yicha "
+        "avtomatik almashtirib beradi — qalin/kursiv/havola kabi formatlash buzilmaydi.\n\n"
+        "📋 <b>Qanday ishlaydi:</b>\n"
+        "1. Menga fayl yuboring (video, hujjat, rasm yoki audio)\n"
+        "2. O'zgartirilishi kerak bo'lgan matnni so'rayman — caption'dan aynan nusxalab (copy-paste) yuboring\n"
+        "3. Keyin bu matn nimaga o'zgarishini so'rayman\n"
+        "4. Qoida o'rnatiladi va shu fayl (hamda keyin yuboradigan BARCHA fayllar) avtomatik o'zgartirilib qaytariladi\n"
+        "5. Original xabaringiz avtomatik o'chiriladi, faqat o'zgartirilgan nusxa qoladi\n\n"
+        "🧩 <b>Foydali imkoniyatlar:</b>\n"
+        "• Matnni butunlay olib tashlash uchun yangi matn o'rniga <code>/empty</code> yozing\n"
+        "• <code>\\n</code>, <code>\\t</code>, <code>\\b</code> kabi escape belgilarni yozsangiz, ular haqiqiy belgiga aylanadi\n\n"
+        "⚙️ <b>Buyruqlar:</b>\n"
+        "/start — shu qo'llanmani ko'rsatadi\n"
+        "/newRule — joriy qoidani tozalab, yangidan boshlaydi\n\n"
+        "Boshlash uchun menga birinchi faylni yuboring!",
+        parse_mode="HTML",
     )
 
 
@@ -234,6 +247,12 @@ async def handle_plain_text(message: Message, state: FSMContext) -> None:
 
 async def main() -> None:
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=None))
+    await bot.set_my_commands(
+        [
+            BotCommand(command="start", description="Bot haqida qo'llanma"),
+            BotCommand(command="newRule", description="Qoidani tozalab qaytadan boshlash"),
+        ]
+    )
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(router)
     await dp.start_polling(bot)
