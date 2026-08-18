@@ -146,13 +146,13 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
         "• <code>\\n</code>, <code>\\t</code>, <code>\\b</code> kabi escape belgilarni yozsangiz, ular haqiqiy belgiga aylanadi\n\n"
         "⚙️ <b>Buyruqlar:</b>\n"
         "/start — shu qo'llanmani ko'rsatadi\n"
-        "/newRule — joriy qoidani tozalab, yangidan boshlaydi\n\n"
+        "/newrule — joriy qoidani tozalab, yangidan boshlaydi\n\n"
         "Boshlash uchun menga birinchi faylni yuboring!",
         parse_mode="HTML",
     )
 
 
-@router.message(Command("newRule"))
+@router.message(Command("newrule", ignore_case=True))
 async def cmd_new_rule(message: Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer("Qoida tozalandi. Endi yangi fayl yuboring — men qayta so'rayman.")
@@ -171,7 +171,7 @@ async def handle_file(message: Message, state: FSMContext) -> None:
         if not changed:
             await message.answer(
                 f"⚠️ \"{escape_for_display(old)}\" ushbu faylning caption'ida topilmadi — hech narsa o'zgarmadi.\n"
-                "Matnni caption'dan nusxalab (copy-paste) qilib qayta tekshiring, keyin /newRule bilan qoidani qayta o'rnating."
+                "Matnni caption'dan nusxalab (copy-paste) qilib qayta tekshiring, keyin /newrule bilan qoidani qayta o'rnating."
             )
         return
 
@@ -229,7 +229,7 @@ async def handle_new_text(message: Message, state: FSMContext) -> None:
     if any_unmatched:
         await message.answer(
             f"⚠️ \"{escape_for_display(old)}\" ba'zi fayllar caption'ida aynan topilmadi — o'sha fayllarda hech narsa o'zgarmadi.\n"
-            "Matnni caption'dan nusxalab (copy-paste) qilib /newRule bilan qayta urinib ko'ring."
+            "Matnni caption'dan nusxalab (copy-paste) qilib /newrule bilan qayta urinib ko'ring."
         )
 
 
@@ -247,12 +247,15 @@ async def handle_plain_text(message: Message, state: FSMContext) -> None:
 
 async def main() -> None:
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=None))
-    await bot.set_my_commands(
-        [
-            BotCommand(command="start", description="Bot haqida qo'llanma"),
-            BotCommand(command="newRule", description="Qoidani tozalab qaytadan boshlash"),
-        ]
-    )
+    try:
+        await bot.set_my_commands(
+            [
+                BotCommand(command="start", description="Bot haqida qo'llanma"),
+                BotCommand(command="newrule", description="Qoidani tozalab qaytadan boshlash"),
+            ]
+        )
+    except TelegramBadRequest as exc:
+        logger.warning("Could not register bot commands: %s", exc)
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(router)
     await dp.start_polling(bot)
