@@ -132,22 +132,22 @@ async def _send_transformed(bot: Bot, chat_id: int, pending: Dict[str, Any], old
 async def cmd_start(message: Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer(
-        "🤖 <b>Fayl caption almashtiruvchi bot</b>\n\n"
-        "Yuborgan fayllaringizning tavsifidagi (caption) matnni siz belgilagan qoida bo'yicha "
-        "avtomatik almashtirib beradi — qalin/kursiv/havola kabi formatlash buzilmaydi.\n\n"
-        "📋 <b>Qanday ishlaydi:</b>\n"
-        "1. Menga fayl yuboring (video, hujjat, rasm yoki audio)\n"
-        "2. O'zgartirilishi kerak bo'lgan matnni so'rayman — caption'dan aynan nusxalab (copy-paste) yuboring\n"
-        "3. Keyin bu matn nimaga o'zgarishini so'rayman\n"
-        "4. Qoida o'rnatiladi va shu fayl (hamda keyin yuboradigan BARCHA fayllar) avtomatik o'zgartirilib qaytariladi\n"
-        "5. Original xabaringiz avtomatik o'chiriladi, faqat o'zgartirilgan nusxa qoladi\n\n"
-        "🧩 <b>Foydali imkoniyatlar:</b>\n"
-        "• Matnni butunlay olib tashlash uchun yangi matn o'rniga <code>/empty</code> yozing\n"
-        "• <code>\\n</code>, <code>\\t</code>, <code>\\b</code> kabi escape belgilarni yozsangiz, ular haqiqiy belgiga aylanadi\n\n"
-        "⚙️ <b>Buyruqlar:</b>\n"
-        "/start — shu qo'llanmani ko'rsatadi\n"
-        "/newrule — joriy qoidani tozalab, yangidan boshlaydi\n\n"
-        "Boshlash uchun menga birinchi faylni yuboring!",
+        "🤖 <b>Caption Replace Bot</b>\n\n"
+        "Automatically replaces text in the caption of files you send, based on a rule you set — "
+        "formatting like bold/italic/links is preserved.\n\n"
+        "📋 <b>How it works:</b>\n"
+        "1. Send me a file (video, document, photo, or audio)\n"
+        "2. I'll ask for the text that needs to be replaced — copy-paste it exactly from the caption\n"
+        "3. Then I'll ask what it should be replaced with\n"
+        "4. The rule is set, and that file (plus every file you send after) gets auto-replaced and sent back\n"
+        "5. Your original message is deleted automatically, leaving only the modified copy\n\n"
+        "🧩 <b>Handy features:</b>\n"
+        "• To remove the matched text entirely, send <code>/empty</code> as the replacement\n"
+        "• Escape sequences like <code>\\n</code>, <code>\\t</code>, <code>\\b</code> are converted to the real character\n\n"
+        "⚙️ <b>Commands:</b>\n"
+        "/start — show this guide\n"
+        "/newrule — clear the current rule and start over\n\n"
+        "Send me your first file to get started!",
         parse_mode="HTML",
     )
 
@@ -155,7 +155,7 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
 @router.message(Command("newrule", ignore_case=True))
 async def cmd_new_rule(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await message.answer("Qoida tozalandi. Endi yangi fayl yuboring — men qayta so'rayman.")
+    await message.answer("Rule cleared. Send a new file — I'll ask again.")
 
 
 @router.message(F.document | F.video | F.photo | F.audio)
@@ -170,8 +170,8 @@ async def handle_file(message: Message, state: FSMContext) -> None:
         changed = await _send_transformed(message.bot, message.chat.id, pending, old, new)
         if not changed:
             await message.answer(
-                f"⚠️ \"{escape_for_display(old)}\" ushbu faylning caption'ida topilmadi — hech narsa o'zgarmadi.\n"
-                "Matnni caption'dan nusxalab (copy-paste) qilib qayta tekshiring, keyin /newrule bilan qoidani qayta o'rnating."
+                f"⚠️ \"{escape_for_display(old)}\" was not found in this file's caption — nothing changed.\n"
+                "Double-check by copy-pasting the text from the caption, then reset the rule with /newrule."
             )
         return
 
@@ -185,26 +185,26 @@ async def handle_file(message: Message, state: FSMContext) -> None:
         return
 
     await state.set_state(ReplaceStates.waiting_old)
-    await message.answer("O'zgartirilishi kerak bo'lgan matn yoki belgini kiriting:")
+    await message.answer("Enter the text or character that needs to be replaced:")
 
 
 @router.message(ReplaceStates.waiting_old)
 async def handle_old_text(message: Message, state: FSMContext) -> None:
     if not message.text:
-        await message.answer("Iltimos, matn ko'rinishida yuboring.")
+        await message.answer("Please send it as text.")
         return
     await state.update_data(old=unescape(message.text))
     await state.set_state(ReplaceStates.waiting_new)
     await message.answer(
-        "Ushbu matn nimaga o'zgarishi kerakligini kiriting:\n"
-        "(butunlay olib tashlamoqchi bo'lsangiz /empty deb yozing)"
+        "Enter what it should be replaced with:\n"
+        "(send /empty to remove it entirely)"
     )
 
 
 @router.message(ReplaceStates.waiting_new)
 async def handle_new_text(message: Message, state: FSMContext) -> None:
     if message.text is None:
-        await message.answer("Iltimos, matn ko'rinishida yuboring.")
+        await message.answer("Please send it as text.")
         return
 
     data = await state.get_data()
@@ -217,8 +217,8 @@ async def handle_new_text(message: Message, state: FSMContext) -> None:
     logger.info("chat=%s rule set %r -> %r, applying to %s pending file(s)", message.chat.id, old, new, len(pending_files))
 
     await message.answer(
-        f"Qoida o'rnatildi: \"{escape_for_display(old)}\" → \"{escape_for_display(new)}\".\n"
-        "Endi barcha yuborilgan va keyingi fayllar avtomatik o'zgartiriladi."
+        f"Rule set: \"{escape_for_display(old)}\" → \"{escape_for_display(new)}\".\n"
+        "All files sent so far and from now on will be auto-replaced."
     )
 
     any_unmatched = False
@@ -228,8 +228,8 @@ async def handle_new_text(message: Message, state: FSMContext) -> None:
 
     if any_unmatched:
         await message.answer(
-            f"⚠️ \"{escape_for_display(old)}\" ba'zi fayllar caption'ida aynan topilmadi — o'sha fayllarda hech narsa o'zgarmadi.\n"
-            "Matnni caption'dan nusxalab (copy-paste) qilib /newrule bilan qayta urinib ko'ring."
+            f"⚠️ \"{escape_for_display(old)}\" was not found in some files' captions — those were left unchanged.\n"
+            "Copy-paste the text from the caption and try again with /newrule."
         )
 
 
@@ -239,7 +239,7 @@ async def handle_plain_text(message: Message, state: FSMContext) -> None:
     old = data.get("old")
     new = data.get("new")
     if old is None or new is None:
-        await message.answer("Avval menga fayl yuboring.")
+        await message.answer("Send me a file first.")
         return
     new_text, new_entities = replace_preserving_entities(message.text, message.entities or [], old, new)
     await message.answer(new_text, entities=new_entities)
@@ -250,8 +250,8 @@ async def main() -> None:
     try:
         await bot.set_my_commands(
             [
-                BotCommand(command="start", description="Bot haqida qo'llanma"),
-                BotCommand(command="newrule", description="Qoidani tozalab qaytadan boshlash"),
+                BotCommand(command="start", description="About this bot"),
+                BotCommand(command="newrule", description="Clear the current rule and start over"),
             ]
         )
     except TelegramBadRequest as exc:
